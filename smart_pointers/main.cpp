@@ -4,7 +4,40 @@
 #include <QDebug>
 #include "shared_ptr.h"
 #include "weak_ptr.h"
+#include "scope_refptr.h"
+#include "weak_ptr_factory.h"
 #include <memory>
+
+class Test : public RefCount<Test> {
+public:
+  Test() {
+      qDebug() << "Test constructor: ";
+  }
+private:
+  ~Test() {
+      qDebug() << "Test destructor: ";
+  }
+
+private:
+  friend class RefCount<Test>;
+};
+
+class Test2 {
+public:
+  Test2() {
+      qDebug() << "Test2 constructor: ";
+  }
+  ~Test2() {
+      qDebug() << "Test2 destructor: ";
+  }
+
+  base::WeakPtr<Test2> GetWeakPtr() {
+    return weak_ptr_factory_.GetWeakPtr();
+  }
+
+private:
+  base::WeakPtrFactory<Test2> weak_ptr_factory_{this};
+};
 
 void TestStdSharedPtr() {
   std::shared_ptr<int> ptr;
@@ -34,6 +67,24 @@ void TestSharedPtr() {
   }
   ptr.reset();
   qDebug() << "ptr count: " << ptr.use_count();
+}
+
+void TestScopeRefPtr() {
+  ScopeRefPtr<Test> ptr(nullptr);
+  {
+    ptr = ScopeRefPtr<Test>(new Test());
+    qDebug() << "ptr count: " << ptr.use_count();
+    {
+      ScopeRefPtr<Test> ptr2 = ptr;
+      qDebug() << "ptr2 count: " << ptr2.use_count();
+    }
+    qDebug() << "ptr count: " << ptr.use_count();
+  }
+  ptr.reset();
+  qDebug() << "ptr count: " << ptr.use_count();
+
+  // Test* test = new Test();
+  // delete test;
 }
 
 void TestStdWeakPtr() {
@@ -84,6 +135,31 @@ void TestWeakPtr() {
   qDebug() << "ptr count end: " << ptr.use_count();
 }
 
+void TestWeakPtrFactory() {
+  base::WeakPtr<Test2> ptr;
+  qDebug() << "ptr count begin: " << ptr.use_count();
+  {
+    SharedPtr<Test2> ptr2 = SharedPtr<Test2>(new Test2());
+    ptr = ptr2->GetWeakPtr();
+    qDebug() << "ptr2 count: " << ptr2.use_count();
+    qDebug() << "ptr count: " << ptr.use_count();
+    base::WeakPtr<Test2> ptr3 = ptr;
+    qDebug() << "ptr3 count: " << ptr3.use_count();
+    ptr2.reset(); 
+    qDebug() << "ptr3 count2: " << ptr3.use_count();
+    qDebug() << "ptr count: " << ptr.use_count();
+  }
+  qDebug() << "ptr count: " << ptr.use_count();
+  {
+    if (ptr) {
+      qDebug() << "ptr4 count: " << ptr.use_count();
+    } else {
+      qDebug() << "ptr4 is expired";
+    }
+  }
+  qDebug() << "ptr count end: " << ptr.use_count();
+}
+
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
@@ -92,9 +168,11 @@ int main(int argc, char *argv[])
 
     TestStdSharedPtr();
     TestSharedPtr();
+    TestScopeRefPtr();
 
     TestStdWeakPtr();
     TestWeakPtr();
+    TestWeakPtrFactory();
 
     qDebug() << "Hello VSCode Qt...";
     return app.exec();
