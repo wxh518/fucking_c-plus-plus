@@ -2,10 +2,12 @@
 #include <QtWidgets/QWidget>
 #include <QtWidgets/QPushButton>
 #include <QDebug>
+#include <QPointer>
 #include "shared_ptr.h"
 #include "weak_ptr.h"
 #include "scope_refptr.h"
 #include "weak_ptr_factory.h"
+#include "qpointer.h"
 #include <memory>
 
 class Test : public RefCount<Test> {
@@ -37,6 +39,26 @@ public:
 
 private:
   base::WeakPtrFactory<Test2> weak_ptr_factory_{this};
+};
+
+class Test3 : public base::QObject {
+public:
+  Test3() {
+      qDebug() << "Test3 constructor: ";
+  }
+  ~Test3() {
+      qDebug() << "Test3 destructor: ";
+  }
+};
+
+class Test4 : public QObject {
+public:
+  Test4() {
+      qDebug() << "Test4 constructor: ";
+  }
+  ~Test4() {
+      qDebug() << "Test4 destructor: ";
+  }
 };
 
 void TestStdSharedPtr() {
@@ -160,6 +182,61 @@ void TestWeakPtrFactory() {
   qDebug() << "ptr count end: " << ptr.use_count();
 }
 
+void TestQPointer() {
+  QPointer<Test4> ptr;
+  qDebug() << "ptr count begin: " << (ptr.data() ? 1 : 0);
+  {
+    Test4* test4 = new Test4();
+    ptr = test4;
+    qDebug() << "ptr count: " << (ptr.data() ? 1 : 0);
+    QPointer<Test4> ptr2 = ptr;
+    qDebug() << "ptr2 count: " << (ptr2.data() ? 1 : 0);
+    delete test4; 
+    qDebug() << "ptr2 count2: " << (ptr2.data() ? 1 : 0);
+    qDebug() << "ptr count: " << (ptr.data() ? 1 : 0);
+  }
+  qDebug() << "ptr count: " << (ptr.data() ? 1 : 0);
+
+
+  QPointer<Test4> qpointer;
+  {
+      std::shared_ptr<Test4> stdptr = std::make_shared<Test4>();
+      qpointer = stdptr.get();
+
+      QPointer<Test4> qpointer2 = std::move(qpointer);
+      qDebug() << "qpointer2 count: " << (qpointer2.data() ? 1 : 0);
+      qDebug() << "qpointer count: " << (qpointer.data() ? 1 : 0);
+  }
+}
+
+void TestBaseQPointer() {
+  base::QPointer<Test3> ptr;
+  qDebug() << "ptr count begin: " << (ptr.data() ? 1 : 0);
+  {
+    Test3* test3 = new Test3();
+    ptr = test3;
+    qDebug() << "ptr count: " << (ptr.data() ? 1 : 0);
+    base::QPointer<Test3> ptr2 = ptr;
+    qDebug() << "ptr2 count: " << (ptr2.data() ? 1 : 0);
+    delete test3; 
+    qDebug() << "ptr2 count2: " << (ptr2.data() ? 1 : 0);
+    qDebug() << "ptr count: " << (ptr.data() ? 1 : 0);
+  }
+  qDebug() << "ptr count: " << (ptr.data() ? 1 : 0);
+
+  //base::QPointer<Test2> ptr3;
+
+  base::QPointer<Test3> qpointer;
+  {
+      std::shared_ptr<Test3> stdptr = std::make_shared<Test3>();
+      qpointer = stdptr.get();
+
+      base::QPointer<Test3> qpointer2 = std::move(qpointer);
+      qDebug() << "base::QPointer<Test3> qpointer2 count: " << (qpointer2.data() ? 1 : 0);
+      qDebug() << "base::QPointer<Test3> qpointer count: " << (qpointer.data() ? 1 : 0);
+  }
+}
+
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);
@@ -174,6 +251,8 @@ int main(int argc, char *argv[])
     TestWeakPtr();
     TestWeakPtrFactory();
 
+    TestQPointer();
+    TestBaseQPointer();
     qDebug() << "Hello VSCode Qt...";
     return app.exec();
 }
